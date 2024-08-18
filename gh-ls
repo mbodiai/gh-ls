@@ -1,0 +1,42 @@
+#!/bin/bash
+set -e
+
+
+
+# Function to print Git repositories and their remote URLs in a pretty table
+print_git_repos() {
+    local base_dir=$1
+
+    echo "Searching for .git directories in $base_dir..."
+    echo
+    printf "%-40s %-20s %-40s %-40s\n" "Repository" "Remote Name" "Fetch URL" "Push URL"
+    printf "%-40s %-20s %-40s %-40s\n" "----------" "-----------" "---------" "--------"
+
+    # Find all .git directories
+    find "$base_dir" -type d -name ".git" | while read -r git_dir; do
+        repo_dir=$(dirname "$git_dir")
+        
+        # Check if the directory is a valid git repository
+        if git -C "$repo_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            git -C "$repo_dir" remote -v | awk '{print $1, $2, $3}' | sort -u | while read -r remote_name remote_url remote_type; do
+                if [ "$remote_type" == "(fetch)" ]; then
+                    fetch_url=$remote_url
+                elif [ "$remote_type" == "(push)" ]; then
+                    push_url=$remote_url
+                fi
+
+                if [ -n "$fetch_url" ] && [ -n "$push_url" ]; then
+                    printf "%-40s %-20s %-40s %-40s\n" "$repo_dir" "$remote_name" "$fetch_url" "$push_url"
+                    fetch_url=""
+                    push_url=""
+                fi
+            done
+        else
+            printf "%-40s %-20s %-40s %-40s\n" "$repo_dir" "N/A" "Not a valid git repository" ""
+        fi
+    done
+}
+
+# Start from the specified directory or current directory if not provided
+base_dir=${1:-.}
+print_git_repos "$base_dir"
